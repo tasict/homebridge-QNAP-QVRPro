@@ -4,10 +4,10 @@
   "platform": "Camera-QNAP-QVRPro",
   "config": [
     {
-      "ip": "192.168.83.39",
-      "port": "5001",
+      "ip": "ip",
+      "port": "port",
       "user": "admin",
-      "password": "cW5hcA==",
+      "password": "password",
       "sslOn" true
     }
   ]
