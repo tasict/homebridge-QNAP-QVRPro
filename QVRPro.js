@@ -17,24 +17,19 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   StreamController = hap.StreamController;
   this.log = log;
 
-  if (!cameraConfig) {
-    throw new Error("Missing source for camera.");
-  }
-
-
-  var QVRPro.pt = QVRProConfig;
+  var ffmpegOpt = cameraConfig;
   var ssl = QVRProConfig.sslOn;
   this.name = cameraConfig.name;
   this.guid = cameraConfig.guid;
   this.videoProcessor = QVRProConfig.videoProcessor || 'ffmpeg';
   this.additionalCommandline = QVRProConfig.additionalCommandline || '-tune zerolatency';
 
+  if (!ffmpegOpt) {
+    throw new Error("Missing source for camera.");
+  }
 
-  this.QVRPro.ource = "-re -i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/streaming/getstream.cgi?sid="+QVRProConfig.sid+"&ch_sid="+this.guid+"&stream_id=0&audio=1&utc=1";
-  this.QVRPro.mageSource = "-i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/getliveimage.cgi?sid="+QVRProConfig.sid+"&guid="+this.guid;
-
- self.log("stream url : " + this.QVRPro.ource);
-
+  this.ffmpegSource = "-re -i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/streaming/getstream.cgi?sid="+QVRProConfig.sid+"&ch_sid="+this.guid+"&stream_id=0&audio=1&utc=1";
+  this.ffmpegImageSource = "-i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/getliveimage.cgi?sid="+QVRProConfig.sid+"&guid="+this.guid;
 
   this.services = [];
   this.streamControllers = [];
@@ -42,15 +37,11 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   this.pendingSessions = {};
   this.ongoingSessions = {};
 
-  this.uploader = cameraConfig.uploader || false;
-  if ( this.uploader )
-    { this.drive = new drive(); }
-
-  var numberOfStreams = QVRPro.pt.maxStreams || 2;
+  var numberOfStreams = ffmpegOpt.maxStreams || 2;
   var videoResolutions = [];
 
-  this.maxWidth = QVRPro.pt.maxWidth || 1280;
-  this.maxHeight = QVRPro.pt.maxHeight || 720;
+  this.maxWidth = ffmpegOpt.maxWidth || 1280;
+  this.maxHeight = ffmpegOpt.maxHeight || 720;
   var maxFPS = (this.fps > 30) ? 30 : this.fps;
 
   if (this.maxWidth >= 320) {
@@ -141,20 +132,20 @@ QVRPro.prototype.handleCloseConnection = function(connectionID) {
 
 QVRPro.prototype.handleSnapshotRequest = function(request, callback) {
   let resolution = request.width + 'x' + request.height;
-  var imageSource = this.QVRPro.mageSource !== undefined ? this.QVRPro.mageSource : this.QVRPro.ource;
-  let QVRPro.= spawn(this.videoProcessor, (imageSource + ' -t 1 -s '+ resolution + ' -f image2 -').split(' '), {env: process.env});
+  var imageSource = this.ffmpegImageSource !== undefined ? this.ffmpegImageSource : this.ffmpegSource;
+  let ffmpeg = spawn(this.videoProcessor, (imageSource + ' -t 1 -s '+ resolution + ' -f image2 -').split(' '), {env: process.env});
   var imageBuffer = Buffer(0);
   this.log("Snapshot from " + this.name + " at " + resolution);
-  if(this.debug) console.log('QVRPro.'+imageSource + ' -t 1 -s '+ resolution + ' -f image2 -');
-  QVRPro.stdout.on('data', function(data) {
+  if(this.debug) console.log('ffmpeg '+imageSource + ' -t 1 -s '+ resolution + ' -f image2 -');
+  ffmpeg.stdout.on('data', function(data) {
     imageBuffer = Buffer.concat([imageBuffer, data]);
   });
   let self = this;
-  QVRPro.on('error', function(error){
+  ffmpeg.on('error', function(error){
     self.log("An error occurs while making snapshot request");
     self.debug ? self.log(error) : null;
   });
-  QVRPro.on('close', function(code) {
+  ffmpeg.on('close', function(code) {
     if ( this.uploader )
       { this.drive.storePicture(this.name,imageBuffer); }
     callback(undefined, imageBuffer);
@@ -286,7 +277,7 @@ QVRPro.prototype.handleStreamRequest = function(request) {
         let audioKey = sessionInfo["audio_srtp"];
         let audioSsrc = sessionInfo["audio_ssrc"];
 
-        let QVRPro.ommand = this.QVRPro.ource + ' -map 0:0' +
+        let ffmpegCommand = this.ffmpegSource + ' -map 0:0' +
           ' -vcodec ' + vcodec +
           ' -pix_fmt yuv420p' +
           ' -r ' + fps +
@@ -307,7 +298,7 @@ QVRPro.prototype.handleStreamRequest = function(request) {
           '&pkt_size=' + packetsize;
 
         if(this.audio){
-          QVRPro.ommand+= ' -map 0:1' +
+          ffmpegCommand+= ' -map 0:1' +
             ' -acodec ' + acodec +
             ' -profile:a aac_eld' +
             ' -flags +global_header' +
@@ -327,30 +318,30 @@ QVRPro.prototype.handleStreamRequest = function(request) {
             '&pkt_size=' + packetsize;
         }
 
-        let QVRPro.= spawn(this.videoProcessor, QVRPro.ommand.split(' '), {env: process.env});
+        let ffmpeg = spawn(this.videoProcessor, ffmpegCommand.split(' '), {env: process.env});
         this.log("Start streaming video from " + this.name + " with " + width + "x" + height + "@" + vbitrate + "kBit");
         if(this.debug){
-          console.log("QVRPro." + QVRPro.ommand);
+          console.log("ffmpeg " + ffmpegCommand);
         }
 
         // Always setup hook on stderr.
         // Without this streaming stops within one to two minutes.
-        QVRPro.stderr.on('data', function(data) {
+        ffmpeg.stderr.on('data', function(data) {
           // Do not log to the console if debugging is turned off
           if(this.debug){
             console.log(data.toString());
           }
         });
         let self = this;
-        QVRPro.on('error', function(error){
+        ffmpeg.on('error', function(error){
             self.log("An error occurs while making stream request");
             self.debug ? self.log(error) : null;
         });
-        QVRPro.on('close', (code) => {
-          if(code == null || code == 0 || code == 255){
+        ffmpeg.on('close', (code) => {
+          if(code == null || code == 0 || code == 255){
             self.log("Stopped streaming");
           } else {
-            self.log("ERROR: QVRPro.exited with code " + code);
+            self.log("ERROR: FFmpeg exited with code " + code);
             for(var i=0; i < self.streamControllers.length; i++){
               var controller = self.streamControllers[i];
               if(controller.sessionIdentifier === sessionID){
@@ -359,14 +350,14 @@ QVRPro.prototype.handleStreamRequest = function(request) {
             }
           }
         });
-        this.ongoingSessions[sessionIdentifier] = QVRPro.
+        this.ongoingSessions[sessionIdentifier] = ffmpeg;
       }
 
       delete this.pendingSessions[sessionIdentifier];
     } else if (requestType == "stop") {
-      var QVRPro.rocess = this.ongoingSessions[sessionIdentifier];
-      if (QVRPro.rocess) {
-        QVRPro.rocess.kill('SIGTERM');
+      var ffmpegProcess = this.ongoingSessions[sessionIdentifier];
+      if (ffmpegProcess) {
+        ffmpegProcess.kill('SIGTERM');
       }
       delete this.ongoingSessions[sessionIdentifier];
     }
