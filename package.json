@@ -13,13 +13,13 @@
   "keywords": [
     "homebridge-plugin"
   ],
-    "engines": {
+  "engines": {
     "node": ">=5.0.0",
     "homebridge": ">=0.4.5"
   },
   "dependencies": {
     "request": "^2.65.0",
-    "polling-to-event": ">=2.0.2"
+    "polling-to-event": ">=2.0.2",
     "express": "^4.13.3",
     "ws": "^0.8.0"
     "ip": "^1.1.3",
