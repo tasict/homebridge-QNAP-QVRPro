@@ -1,18 +1,24 @@
 {
-  "name": "homebridge-QNAP-QVRPro",
-  "version": "0.0.1",
-  "description": "QVRPro plugin for homebridge: https://github.com/tasict/homebridge-QNAP-QVRPro",
-  "license": "ISC",
+  "name": "homebridge-qnap-qvrpro",
+  "version": "0.0.2",
+  "description": "QVRPro Plugins for homebridge",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tasict/homebridge-QNAP-QVRPro.git"
+  },
   "keywords": [
     "homebridge-plugin"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/tasict/homebridge-QNAP-QVRPro"
-  },
+  "author": "CT",
+  "license": "ISC",
   "bugs": {
     "url": "https://github.com/tasict/homebridge-QNAP-QVRPro/issues"
   },
+  "homepage": "https://github.com/tasict/homebridge-QNAP-QVRPro#readme",
   "engines": {
     "node": ">=5.0.0",
     "homebridge": ">=0.4.5"
@@ -25,4 +31,5 @@
     "ip": "^1.1.3",
     "debug": "^2.2.0"
   }
+
 }
