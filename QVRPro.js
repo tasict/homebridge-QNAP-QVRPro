@@ -5,37 +5,36 @@ var crypto = require('crypto');
 var fs = require('fs');
 var ip = require('ip');
 var spawn = require('child_process').spawn;
-var drive = require('./drive').drive;
 
 module.exports = {
-  FFMPEG: FFMPEG
+  QVRPro: QVRPro
 };
 
-function FFMPEG(hap, cameraConfig, log, videoProcessor) {
+function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   uuid = hap.uuid;
   Service = hap.Service;
   Characteristic = hap.Characteristic;
   StreamController = hap.StreamController;
   this.log = log;
 
-  var ffmpegOpt = cameraConfig.videoConfig;
-  this.name = cameraConfig.name;
-  this.vcodec = ffmpegOpt.vcodec;
-  this.videoProcessor = videoProcessor || 'ffmpeg';
-  this.audio = ffmpegOpt.audio;
-  this.acodec = ffmpegOpt.acodec;
-  this.packetsize = ffmpegOpt.packetSize
-  this.fps = ffmpegOpt.maxFPS || 10;
-  this.maxBitrate = ffmpegOpt.maxBitrate || 300;
-  this.debug = ffmpegOpt.debug;
-  this.additionalCommandline = ffmpegOpt.additionalCommandline || '-tune zerolatency';
-
-  if (!ffmpegOpt.source) {
+  if (!cameraConfig) {
     throw new Error("Missing source for camera.");
   }
 
-  this.ffmpegSource = ffmpegOpt.source;
-  this.ffmpegImageSource = ffmpegOpt.stillImageSource;
+
+  var QVRPro.pt = QVRProConfig;
+  var ssl = QVRProConfig.sslOn;
+  this.name = cameraConfig.name;
+  this.guid = cameraConfig.guid;
+  this.videoProcessor = QVRProConfig.videoProcessor || 'ffmpeg';
+  this.additionalCommandline = QVRProConfig.additionalCommandline || '-tune zerolatency';
+
+
+  this.QVRPro.ource = "-re -i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/streaming/getstream.cgi?sid="+QVRProConfig.sid+"&ch_sid="+this.guid+"&stream_id=0&audio=1&utc=1";
+  this.QVRPro.mageSource = "-i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/getliveimage.cgi?sid="+QVRProConfig.sid+"&guid="+this.guid;
+
+ self.log("stream url : " + this.QVRPro.ource);
+
 
   this.services = [];
   this.streamControllers = [];
@@ -47,11 +46,11 @@ function FFMPEG(hap, cameraConfig, log, videoProcessor) {
   if ( this.uploader )
     { this.drive = new drive(); }
 
-  var numberOfStreams = ffmpegOpt.maxStreams || 2;
+  var numberOfStreams = QVRPro.pt.maxStreams || 2;
   var videoResolutions = [];
 
-  this.maxWidth = ffmpegOpt.maxWidth || 1280;
-  this.maxHeight = ffmpegOpt.maxHeight || 720;
+  this.maxWidth = QVRPro.pt.maxWidth || 1280;
+  this.maxHeight = QVRPro.pt.maxHeight || 720;
   var maxFPS = (this.fps > 30) ? 30 : this.fps;
 
   if (this.maxWidth >= 320) {
@@ -134,35 +133,35 @@ function FFMPEG(hap, cameraConfig, log, videoProcessor) {
   this._createStreamControllers(numberOfStreams, options);
 }
 
-FFMPEG.prototype.handleCloseConnection = function(connectionID) {
+QVRPro.prototype.handleCloseConnection = function(connectionID) {
   this.streamControllers.forEach(function(controller) {
     controller.handleCloseConnection(connectionID);
   });
 }
 
-FFMPEG.prototype.handleSnapshotRequest = function(request, callback) {
+QVRPro.prototype.handleSnapshotRequest = function(request, callback) {
   let resolution = request.width + 'x' + request.height;
-  var imageSource = this.ffmpegImageSource !== undefined ? this.ffmpegImageSource : this.ffmpegSource;
-  let ffmpeg = spawn(this.videoProcessor, (imageSource + ' -t 1 -s '+ resolution + ' -f image2 -').split(' '), {env: process.env});
+  var imageSource = this.QVRPro.mageSource !== undefined ? this.QVRPro.mageSource : this.QVRPro.ource;
+  let QVRPro.= spawn(this.videoProcessor, (imageSource + ' -t 1 -s '+ resolution + ' -f image2 -').split(' '), {env: process.env});
   var imageBuffer = Buffer(0);
   this.log("Snapshot from " + this.name + " at " + resolution);
-  if(this.debug) console.log('ffmpeg '+imageSource + ' -t 1 -s '+ resolution + ' -f image2 -');
-  ffmpeg.stdout.on('data', function(data) {
+  if(this.debug) console.log('QVRPro.'+imageSource + ' -t 1 -s '+ resolution + ' -f image2 -');
+  QVRPro.stdout.on('data', function(data) {
     imageBuffer = Buffer.concat([imageBuffer, data]);
   });
   let self = this;
-  ffmpeg.on('error', function(error){
+  QVRPro.on('error', function(error){
     self.log("An error occurs while making snapshot request");
     self.debug ? self.log(error) : null;
   });
-  ffmpeg.on('close', function(code) {
+  QVRPro.on('close', function(code) {
     if ( this.uploader )
       { this.drive.storePicture(this.name,imageBuffer); }
     callback(undefined, imageBuffer);
   }.bind(this));
 }
 
-FFMPEG.prototype.prepareStream = function(request, callback) {
+QVRPro.prototype.prepareStream = function(request, callback) {
   var sessionInfo = {};
 
   let sessionID = request["sessionID"];
@@ -239,7 +238,7 @@ FFMPEG.prototype.prepareStream = function(request, callback) {
   callback(response);
 }
 
-FFMPEG.prototype.handleStreamRequest = function(request) {
+QVRPro.prototype.handleStreamRequest = function(request) {
   var sessionID = request["sessionID"];
   var requestType = request["type"];
   if (sessionID) {
@@ -287,7 +286,7 @@ FFMPEG.prototype.handleStreamRequest = function(request) {
         let audioKey = sessionInfo["audio_srtp"];
         let audioSsrc = sessionInfo["audio_ssrc"];
 
-        let ffmpegCommand = this.ffmpegSource + ' -map 0:0' +
+        let QVRPro.ommand = this.QVRPro.ource + ' -map 0:0' +
           ' -vcodec ' + vcodec +
           ' -pix_fmt yuv420p' +
           ' -r ' + fps +
@@ -308,7 +307,7 @@ FFMPEG.prototype.handleStreamRequest = function(request) {
           '&pkt_size=' + packetsize;
 
         if(this.audio){
-          ffmpegCommand+= ' -map 0:1' +
+          QVRPro.ommand+= ' -map 0:1' +
             ' -acodec ' + acodec +
             ' -profile:a aac_eld' +
             ' -flags +global_header' +
@@ -328,30 +327,30 @@ FFMPEG.prototype.handleStreamRequest = function(request) {
             '&pkt_size=' + packetsize;
         }
 
-        let ffmpeg = spawn(this.videoProcessor, ffmpegCommand.split(' '), {env: process.env});
+        let QVRPro.= spawn(this.videoProcessor, QVRPro.ommand.split(' '), {env: process.env});
         this.log("Start streaming video from " + this.name + " with " + width + "x" + height + "@" + vbitrate + "kBit");
         if(this.debug){
-          console.log("ffmpeg " + ffmpegCommand);
+          console.log("QVRPro." + QVRPro.ommand);
         }
 
         // Always setup hook on stderr.
         // Without this streaming stops within one to two minutes.
-        ffmpeg.stderr.on('data', function(data) {
+        QVRPro.stderr.on('data', function(data) {
           // Do not log to the console if debugging is turned off
           if(this.debug){
             console.log(data.toString());
           }
         });
         let self = this;
-        ffmpeg.on('error', function(error){
+        QVRPro.on('error', function(error){
             self.log("An error occurs while making stream request");
             self.debug ? self.log(error) : null;
         });
-        ffmpeg.on('close', (code) => {
+        QVRPro.on('close', (code) => {
           if(code == null || code == 0 || code == 255){
             self.log("Stopped streaming");
           } else {
-            self.log("ERROR: FFmpeg exited with code " + code);
+            self.log("ERROR: QVRPro.exited with code " + code);
             for(var i=0; i < self.streamControllers.length; i++){
               var controller = self.streamControllers[i];
               if(controller.sessionIdentifier === sessionID){
@@ -360,21 +359,21 @@ FFMPEG.prototype.handleStreamRequest = function(request) {
             }
           }
         });
-        this.ongoingSessions[sessionIdentifier] = ffmpeg;
+        this.ongoingSessions[sessionIdentifier] = QVRPro.
       }
 
       delete this.pendingSessions[sessionIdentifier];
     } else if (requestType == "stop") {
-      var ffmpegProcess = this.ongoingSessions[sessionIdentifier];
-      if (ffmpegProcess) {
-        ffmpegProcess.kill('SIGTERM');
+      var QVRPro.rocess = this.ongoingSessions[sessionIdentifier];
+      if (QVRPro.rocess) {
+        QVRPro.rocess.kill('SIGTERM');
       }
       delete this.ongoingSessions[sessionIdentifier];
     }
   }
 }
 
-FFMPEG.prototype.createCameraControlService = function() {
+QVRPro.prototype.createCameraControlService = function() {
   var controlService = new Service.CameraControl();
 
   this.services.push(controlService);
@@ -387,7 +386,7 @@ FFMPEG.prototype.createCameraControlService = function() {
 
 // Private
 
-FFMPEG.prototype._createStreamControllers = function(maxStreams, options) {
+QVRPro.prototype._createStreamControllers = function(maxStreams, options) {
   let self = this;
 
   for (var i = 0; i < maxStreams; i++) {

@@ -1,25 +1,27 @@
 {
-  "name": "homebridge-camera-ffmpeg",
-  "version": "0.1.8",
-  "description": "ffmpeg plugin for homebridge: https://github.com/nfarina/homebridge",
+  "name": "homebridge-QNAP-QVRPro",
+  "version": "0.0.1",
+  "description": "QVRPro plugin for homebridge: https://github.com/tasict/homebridge-QNAP-QVRPro",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/KhaosT/homebridge-camera-ffmpeg.git"
+    "url": "https://github.com/tasict/homebridge-QNAP-QVRPro"
   },
   "bugs": {
-    "url": "http://github.com/KhaosT/homebridge-camera-ffmpeg/issues"
+    "url": "https://github.com/tasict/homebridge-QNAP-QVRPro/issues"
   },
   "engines": {
     "node": ">=5.0.0",
     "homebridge": ">=0.4.5"
   },
   "dependencies": {
-    "google-auth-library": "^0.10.0",
-    "googleapis": "^18.0.0",
+    "request": "^2.65.0",
+    "polling-to-event": ">=2.0.2"
+    "express": "^4.13.3",
+    "ws": "^0.8.0"
     "ip": "^1.1.3",
     "debug": "^2.2.0"
   }
