@@ -1,6 +1,6 @@
 {
   "name": "homebridge-qnap-qvrpro",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "QVRPro Plugins for homebridge",
   "main": "index.js",
   "scripts": {
