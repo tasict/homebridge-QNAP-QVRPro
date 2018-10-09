@@ -45,6 +45,12 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   this.name = cameraConfig.name;
   this.guid = cameraConfig.guid;
   this.videoProcessor = QVRProConfig.videoProcessor || 'ffmpeg';
+  this.audio = ffmpegOpt.audio;
+  this.acodec = ffmpegOpt.acodec;
+  this.packetsize = ffmpegOpt.packetSize
+  this.fps = ffmpegOpt.maxFPS || 10;
+  this.maxBitrate = ffmpegOpt.maxBitrate || 300;
+  this.debug = ffmpegOpt.debug;
   this.additionalCommandline = QVRProConfig.additionalCommandline || '-tune zerolatency';
 
   if (!ffmpegOpt) {
