@@ -4,11 +4,29 @@ var uuid, Service, Characteristic, StreamController;
 var crypto = require('crypto');
 var fs = require('fs');
 var ip = require('ip');
+var et = require('elementtree');
 var spawn = require('child_process').spawn;
 
 module.exports = {
   QVRPro: QVRPro
 };
+
+function fetchSID(ip, port, ssl, user, password, callback){
+
+  request((ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi??user=" + user + "&pwd=" + password + "&service=1", function (error, response, body) {
+
+    var sid = "";
+
+    if (!error && response.statusCode == 200) {      
+      var etree = et.parse(body);
+      sid = etree.findtext('./QDocRoot/authSid');
+    }
+
+    callback(sid);
+
+  });
+
+}
 
 function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   uuid = hap.uuid;
@@ -131,7 +149,7 @@ QVRPro.prototype.handleCloseConnection = function(connectionID) {
 }
 
 QVRPro.prototype.handleSnapshotRequest = function(request, callback) {
-  let resolution = request.width + 'x' + request.height;
+    let resolution = request.width + 'x' + request.height;
   var imageSource = this.ffmpegImageSource !== undefined ? this.ffmpegImageSource : this.ffmpegSource;
   let ffmpeg = spawn(this.videoProcessor, (imageSource + ' -t 1 -s '+ resolution + ' -f image2 -').split(' '), {env: process.env});
   var imageBuffer = Buffer(0);

@@ -1,9 +1,13 @@
 var Accessory, hap, UUIDGen;
 
+
 var QVRPro = require('./QVRPro').QVRPro;
-var WebSocketClient = require('websocket').client;
 var request = require("request");
+var et = require('elementtree');
 var pollingtoevent = require("polling-to-event");
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 
 module.exports = function(homebridge) {
   Accessory = homebridge.platformAccessory;
@@ -13,47 +17,48 @@ module.exports = function(homebridge) {
   homebridge.registerPlatform("homebridge-QNAP-QVRPro", "Camera-QNAP-QVRPro", QVRProPlatform, true);
 }
 
-function fetchSID(ip, port, ssl, user, password){
-
-  var request = require('request');
-  var sid = "";
+function fetchSID(ip, port, ssl, user, password, callback){
 
   request((ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi??user=" + user + "&pwd=" + password + "&service=1", function (error, response, body) {
+
+    var sid = "";
+
     if (!error && response.statusCode == 200) {
-
-      sid = body.getElementById('authSid');
-
+      
+      var etree = et.parse(body);
+      sid = etree.findtext('./QDocRoot/authSid');
     }
-  });
 
-  return sid;
+    callback(sid);
+
+  });
 
 }
 
-function fetchCameras(ip, port, ssl, sid){
+function fetchCameras(ip, port, ssl, sid, callback){
 
-  var request = require('request');
   var cameras = [];
-
 
   request((ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/camera_status.cgi?x-apima-key=%40APIMA_KEY%40&sid=" + sid +"&act=get_all_status", function (error, response, body) {
     if (!error && response.statusCode == 200) {
 
-      body.datas.forEach(function(cameraConfig) {
+      JSON.parse(body).datas.forEach(function(cameraConfig) {
           var guid = cameraConfig.name;
           var name = cameraConfig.guid;
 
           if (!guid || !name) {
-            self.log("Missing parameters.");
+            this.log("Missing parameters.");
             continue;
           }
 
           cameras.push(cameraConfig);
         });
       }
-  });
 
-  return cameras;
+      callback(cameras);
+
+
+  });
 
 }
 
@@ -85,31 +90,52 @@ QVRProPlatform.prototype.didFinishLaunching = function() {
 
   var self = this;
   
-  var sslOn = self.config.sslOn || false;
   var videoProcessor = self.config.videoProcessor || 'ffmpeg';
 
-
-  if (self.config.ip && self.config.port && self.config.user && self.config.password) {
+  if (self.config.server && self.config.server.ip && self.config.server.port && self.config.server.user && self.config.server.password) {
+    
     var configuredAccessories = [];
+    var cameras = [];
 
-    self.config.sid=fetchSID(self.config.ip, self.config.port, sslOn, self.config.user, self.config.password)
- 
-    var cameras =  fetchCameras(self.config.ip, self.config.port, sslOn, sslOn, self.config.sid);
-
-    for(i = 0 ; i < sizeof(cameras) ; i++){
-
-      var uuid = UUIDGen.generate(cameras[i].guid);
-      var cameraAccessory = new Accessory(cameras[i].name, uuid, hap.Accessory.Categories.CAMERA);
-      var cameraSource = new QVRPro(hap, self.config, cameras[i], self.log);
-      cameraAccessory.configureCameraSource(cameraSource);
-      configuredAccessories.push(cameraAccessory);
+    var ip = self.config.server.ip;
+    var port = self.config.server.port;
+    var user = self.config.server.user;
+    var password = self.config.server.password;
+    var ssl = self.config.server.sslOn || false;
 
 
+    
+    fetchSID(ip, port, ssl, user, password, function (sid) {
 
-    }
+      self.log("sid:" + sid);
 
-    self.api.publishCameraAccessories("Camera-QNAP-QVRPro", configuredAccessories);
+      if(sid.length > 0){
+
+        fetchCameras(ip, port, ssl, sid, function (cameras){
+
+          cameras.forEach(function(camera) {
+              var uuid = UUIDGen.generate(camera.guid);
+              var cameraAccessory = new Accessory(camera.name, uuid, hap.Accessory.Categories.CAMERA);
+              var cameraSource = new QVRPro(hap, self.config.server, camera, self.log);
+              cameraAccessory.configureCameraSource(cameraSource);
+              configuredAccessories.push(cameraAccessory);
+
+              self.log("Found Camera:" + camera.name);
+
+          });
+
+          self.api.publishCameraAccessories("Camera-QNAP-QVRPro", configuredAccessories);
+
+        });
+
+
+      }
+
+
+    });
+
   }
 }
+
 
 
