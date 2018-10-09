@@ -13,13 +13,15 @@ module.exports = {
 
 function fetchSID(ip, port, ssl, user, password, callback){
 
-  request((ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi??user=" + user + "&pwd=" + password + "&service=1", function (error, response, body) {
+  var sid = "";
+  var url = (ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi?user=" + user + "&pwd=" + encodeURIComponent(password) + "&service=1";
 
-    var sid = "";
+  request(url, function (error, response, body) {
 
-    if (!error && response.statusCode == 200) {      
+    if (!error && response.statusCode == 200) {
+      
       var etree = et.parse(body);
-      sid = etree.findtext('./QDocRoot/authSid');
+      sid = etree.findtext('authSid') ? etree.findtext('authSid') : "";
     }
 
     callback(sid);
@@ -27,7 +29,6 @@ function fetchSID(ip, port, ssl, user, password, callback){
   });
 
 }
-
 function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   uuid = hap.uuid;
   Service = hap.Service;
@@ -35,8 +36,12 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   StreamController = hap.StreamController;
   this.log = log;
 
-  var ffmpegOpt = cameraConfig;
-  var ssl = QVRProConfig.sslOn;
+  var ffmpegOpt = QVRProConfig;
+  var ip = QVRProConfig.ip;
+  var port = QVRProConfig.port;
+  var ssl = QVRProConfig.sslOn || false;
+  var sid = QVRProConfig.sid;
+
   this.name = cameraConfig.name;
   this.guid = cameraConfig.guid;
   this.videoProcessor = QVRProConfig.videoProcessor || 'ffmpeg';
@@ -46,8 +51,11 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
     throw new Error("Missing source for camera.");
   }
 
-  this.ffmpegSource = "-re -i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/streaming/getstream.cgi?sid="+QVRProConfig.sid+"&ch_sid="+this.guid+"&stream_id=0&audio=1&utc=1";
-  this.ffmpegImageSource = "-i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/getliveimage.cgi?sid="+QVRProConfig.sid+"&guid="+this.guid;
+  this.ffmpegSource = "-re -i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/streaming/getstream.cgi?sid="+sid+"&ch_sid="+this.guid+"&stream_id=0&audio=0&utc=1";
+  this.ffmpegImageSource = "-i " +  (ssl?"https://":"http://") + ip + ":" + port + "/qvrpro/apis/getliveimage.cgi?sid="+sid+"&guid="+this.guid;
+
+  this.log(this.name + " ffmpegSource:" + this.ffmpegSource);
+  this.log(this.name + " ffmpegImageSource:" + this.ffmpegImageSource);
 
   this.services = [];
   this.streamControllers = [];
@@ -58,8 +66,9 @@ function QVRPro(hap, QVRProConfig, cameraConfig, log) {
   var numberOfStreams = ffmpegOpt.maxStreams || 2;
   var videoResolutions = [];
 
-  this.maxWidth = ffmpegOpt.maxWidth || 1280;
-  this.maxHeight = ffmpegOpt.maxHeight || 720;
+  this.maxWidth = ffmpegOpt.maxWidth || 1920;
+  this.maxHeight = ffmpegOpt.maxHeight || 1080;
+
   var maxFPS = (this.fps > 30) ? 30 : this.fps;
 
   if (this.maxWidth >= 320) {

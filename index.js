@@ -19,14 +19,16 @@ module.exports = function(homebridge) {
 
 function fetchSID(ip, port, ssl, user, password, callback){
 
-  request((ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi??user=" + user + "&pwd=" + password + "&service=1", function (error, response, body) {
+  var sid = "";
+  var url = (ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi?user=" + user + "&pwd=" + encodeURIComponent(password) + "&service=1";
 
-    var sid = "";
+
+  request(url, function (error, response, body) {
 
     if (!error && response.statusCode == 200) {
       
       var etree = et.parse(body);
-      sid = etree.findtext('./QDocRoot/authSid');
+      sid = etree.findtext('authSid') ? etree.findtext('authSid') : "";
     }
 
     callback(sid);
@@ -35,7 +37,32 @@ function fetchSID(ip, port, ssl, user, password, callback){
 
 }
 
-function fetchCameras(ip, port, ssl, sid, callback){
+function keepSIDAlive(QVRProConfig, callback){
+
+  var ip = QVRProConfig.ip;
+  var port = QVRProConfig.port;
+  var ssl = QVRProConfig.sslOn || false;
+
+  var url = (ssl?"https://":"http://") + ip + ":" + port + "/cgi-bin/authLogin.cgi?sid=" + QVRProConfig.sid;
+
+  request(url, function (error, response, body) {
+
+    if (!error && response.statusCode == 200) {
+      console.log("keep sid:" + QVRProConfig.sid);
+    }
+    else {
+
+      fetchSID(ip, port, ssl, user, password, function (sid) {
+        callback(sid);
+      });
+      
+    }
+
+  });
+
+}
+
+function fetchCameras (ip, port, ssl, sid, callback){
 
   var cameras = [];
 
@@ -46,12 +73,10 @@ function fetchCameras(ip, port, ssl, sid, callback){
           var guid = cameraConfig.name;
           var name = cameraConfig.guid;
 
-          if (!guid || !name) {
-            this.log("Missing parameters.");
-            continue;
+          if (guid && name) {
+            cameras.push(cameraConfig);
           }
 
-          cameras.push(cameraConfig);
         });
       }
 
@@ -97,12 +122,12 @@ QVRProPlatform.prototype.didFinishLaunching = function() {
     var configuredAccessories = [];
     var cameras = [];
 
-    var ip = self.config.server.ip;
-    var port = self.config.server.port;
-    var user = self.config.server.user;
-    var password = self.config.server.password;
-    var ssl = self.config.server.sslOn || false;
-
+    var QVRProConfig = self.config.server;
+    var ip = QVRProConfig.ip;
+    var port = QVRProConfig.port;
+    var user = QVRProConfig.user;
+    var password = new Buffer(QVRProConfig.password).toString('base64');
+    var ssl = QVRProConfig.sslOn || false;
 
     
     fetchSID(ip, port, ssl, user, password, function (sid) {
@@ -111,12 +136,23 @@ QVRProPlatform.prototype.didFinishLaunching = function() {
 
       if(sid.length > 0){
 
-        fetchCameras(ip, port, ssl, sid, function (cameras){
+        QVRProConfig.sid = sid;
+
+        var keepAlive = setInterval( function() { 
+
+          keepSIDAlive(QVRProConfig, function(sid){
+            QVRProConfig.sid = sid;
+          });
+
+
+        }, 30000 );
+
+        fetchCameras(ip, port, ssl, QVRProConfig.sid, function (cameras){
 
           cameras.forEach(function(camera) {
               var uuid = UUIDGen.generate(camera.guid);
               var cameraAccessory = new Accessory(camera.name, uuid, hap.Accessory.Categories.CAMERA);
-              var cameraSource = new QVRPro(hap, self.config.server, camera, self.log);
+              var cameraSource = new QVRPro(hap, QVRProConfig, camera, self.log);
               cameraAccessory.configureCameraSource(cameraSource);
               configuredAccessories.push(cameraAccessory);
 
