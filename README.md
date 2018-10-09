@@ -1,3 +1,6 @@
+This plugins is not QNAP offical plugins. 
+
+
 ```
 {
     "bridge": {
